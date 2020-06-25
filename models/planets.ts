@@ -1,8 +1,10 @@
-import { join } from "https://deno.land/std/path/mod.ts";
-import { BufReader } from "https://deno.land/std/io/bufio.ts";
-import { parse } from "https://deno.land/std/encoding/csv.ts";
-import * as log from "https://deno.land/std/log/mod.ts";
-import _ from "https://deno.land/x/deno_lodash/mod.ts";
+import { 
+  log,
+  join,
+  parse,
+  BufReader,
+  pick,
+} from "../deps.ts";
 
 type Planet = Record<string, string>;
 
@@ -11,17 +13,17 @@ let planets: Array<Planet>;
 export function filterHabitablePlanets(planets: Array<Planet>) {
   return planets.filter((planet) => {
     const planetaryRadius = Number(planet["koi_prad"]);
-    const stellarMass = Number(planet["koi_smass"]);
     const stellarRadius = Number(planet["koi_srad"]);
+    const stellarMass = Number(planet["koi_smass"]);
 
     return planet["koi_disposition"] === "CONFIRMED" &&
       planetaryRadius > 0.5 && planetaryRadius < 1.5 &&
-      stellarMass > 0.78 && stellarMass < 1.04 &&
-      stellarRadius > 0.99 && stellarRadius < 1.01;
+      stellarRadius > 0.98 && stellarRadius < 1.02 &&
+      stellarMass > 0.78 && stellarMass < 1.04;
   });
 }
 
-async function loadPlanetsData() {
+async function loadPlanetData() {
   const path = join("data", "original.csv");
 
   const file = await Deno.open(path);
@@ -31,27 +33,27 @@ async function loadPlanetsData() {
     header: true,
     comment: "#",
   });
-  //avoid leak resource
+
+  // Close file resource id (rid) to avoid leaking resources.
   Deno.close(file.rid);
 
   const planets = filterHabitablePlanets(result as Array<Planet>);
 
   return planets.map((planet) => {
-    return _.pick(planet, [
+    return pick(planet, [
+      "kepler_name",
       "koi_prad",
       "koi_smass",
       "koi_srad",
-      "kepler_name",
       "koi_count",
       "koi_steff",
-      "koi_period",
     ]);
   });
 }
 
-planets = await loadPlanetsData();
-log.info(`${planets.length} habitable planets`);
+planets = await loadPlanetData();
+log.info(`${planets.length} habitable planets found!`);
 
-export function getAllPlanets() {
+export function getAll() {
   return planets;
 }
