@@ -1,4 +1,5 @@
-let launches = [];
+// @ts-nocheck
+let launches;
 
 const numberHeading = "No.".padStart(5);
 const dateHeading = "Date".padEnd(15);
@@ -15,21 +16,32 @@ function initValues() {
 }
 
 function loadLaunches() {
-  // TODO: Once API is ready.
-  // Load launches and sort by flight number.
+  return fetch("/launches")
+    .then((launchesResponse) => launchesResponse.json())
+    .then((fetchedLaunches) => {
+      launches = fetchedLaunches.sort((a, b) => {
+        return a.flightNumber < b.flightNumber;
+      });
+    });
 }
 
 function loadPlanets() {
-  // TODO: Once API is ready.
-  // const planetSelector = document.getElementById("planets-selector");
-  // planets.forEach((planet) => {
-  //   planetSelector.innerHTML += `<option value="${planet.kepler_name}">${planet.kepler_name}</option>`;
-  // });
+  return fetch("/planets")
+    .then((planetsResponse) => planetsResponse.json())
+    .then((planets) => {
+      const planetSelector = document.getElementById("planets-selector");
+      planets.forEach((planet) => {
+        planetSelector.innerHTML += `<option value="${planet.kepler_name}">${planet.kepler_name}</option>`;
+      });
+    });
 }
 
 function abortLaunch() {
-  // TODO: Once API is ready.
-  // Delete launch and reload launches.
+  return fetch(`/launches/${id}`, {
+    method: "delete",
+  })
+  .then(loadLaunches)
+  .then(listUpcoming);
 }
 
 function submitLaunch() {
@@ -39,8 +51,23 @@ function submitLaunch() {
   const rocket = document.getElementById("rocket-name").value;
   const flightNumber = launches[launches.length - 1].flightNumber + 1;
 
-  // TODO: Once API is ready.
-  // Submit above data to launch system and reload launches.
+  return fetch("/launches", {
+    method: "post",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      launchDate: Math.floor(launchDate / 1000),
+      flightNumber,
+      mission,
+      rocket,
+      target,
+    }),
+  })
+    .then(() => {
+      document.getElementById("launch-success").hidden = false;
+    })
+    .then(loadLaunches);
 }
 
 function listUpcoming() {
@@ -64,7 +91,9 @@ function listHistory() {
   launches
     .filter((launch) => !launch.upcoming)
     .forEach((launch) => {
-      const success = launch.success ? `<span class="success">█</span>` : `<span class="failure">█</span>`;
+      const success = launch.success
+        ? `<span class="success">█</span>`
+        : `<span class="failure">█</span>`;
       const launchDate = new Date(launch.launchDate * 1000).toDateString();
       const flightNumber = String(launch.flightNumber).padEnd(3);
       const mission = launch.mission.slice(0, 25).padEnd(25);
@@ -77,9 +106,11 @@ function listHistory() {
 function navigate(navigateTo) {
   const pages = ["history", "upcoming", "launch"];
   document.getElementById(navigateTo).hidden = false;
-  pages.filter((page) => page !== navigateTo).forEach((page) => {
-    document.getElementById(page).hidden = true;
-  })
+  pages
+    .filter((page) => page !== navigateTo)
+    .forEach((page) => {
+      document.getElementById(page).hidden = true;
+    });
   document.getElementById("launch-success").hidden = true;
 
   if (navigateTo === "upcoming") {

@@ -1,14 +1,44 @@
 import { Application, send } from "https://deno.land/x/oak@v5.0.0/mod.ts";
+import * as log from "https://deno.land/std/log/mod.ts";
+
+import api from "./api.ts";
 
 const app = new Application();
 const PORT = 8000;
+
+await log.setup({
+  handlers: {
+    console: new log.handlers.ConsoleHandler("INFO"),
+  },
+  loggers: {
+    default: {
+      level: "INFO",
+      handlers: ["console"],
+    },
+  },
+});
+
+app.addEventListener("error", (event) => {
+  log.error(event.error);
+})
+
+// error handling for the downstream middleware
+app.use(async (ctx, next) => {
+   try {
+     await next();
+    } catch(err) {
+      log.error(err);
+      ctx.response.body = "Internal server error";
+      throw err;
+    }
+})
 
 // next async controls when next piece of mw is caleld
 app.use(async (ctx, next) => {
   // codes keep running waiting for the next from the api
   await next();
   const time = ctx.response.headers.get("X-Response-Time");
-  console.log(`${ctx.request.method} ${ctx.request.url}: ${time}`);
+  log.info(`${ctx.request.method} ${ctx.request.url}: ${time}`);
 });
 
 // measuring time
@@ -19,38 +49,30 @@ app.use(async (ctx, next) => {
   ctx.response.headers.set("X-Response-Time", `${delta}ms`);
 });
 
+// ascii art route
+app.use(api.routes());
+app.use(api.allowedMethods());
+
 // serving file
 app.use(async (ctx) => {
   // endpoint
   const filePath = ctx.request.url.pathname;
   const fileWhitelist = [
     "/index.html",
-    "/javascript/scrip.js",
-    "/stylesheets/styles.css",
-    "/images/favicon.png"
+    "/javascripts/script.js",
+    "/stylesheets/style.css",
+    "/images/favicon.png",
+    "/videos/space.mp4",
   ];
-  if(fileWhitelist.includes(filePath)) {
+  if (fileWhitelist.includes(filePath)) {
     await send(ctx, filePath, {
-      root: `${Deno.cwd()}/public`
-    })
+      root: `${Deno.cwd()}/public`,
+    });
   }
 });
 
-// middleware function. ctx contains current state of app, two main props: request and response. check oak docs for more.
-
-app.use(async (ctx, next) => {
-  // endpoint
-  ctx.response.body = `                  
-    _ __   __ _ ___  __ _ 
-   | '_   / _' / __|/ _' |
-   | | | | (_|  __   (_| |
-   |_| |_| __,_|___/ __,_|
-
-      Misson Control API`;
-  await next();
-});
-
 if (import.meta.main) {
+  log.info(`Starting server on port ${PORT}....`);
   await app.listen({
     port: PORT,
   });
